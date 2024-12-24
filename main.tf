@@ -40,7 +40,6 @@ resource "aws_instance" "web_server" {
     connection {
       type     = "ssh"
       user     = "ubuntu"  # Adjust based on the AMI's default user
-      private_key = file("~/.ssh/my-key-pair.pem")  # Path to your private key
       host     = self.public_ip
     }
   }
