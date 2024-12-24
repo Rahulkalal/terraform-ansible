@@ -1,10 +1,53 @@
 provider "aws" {
-  region = "us-east-1"  # Change to your desired region
+  region = "us-east-1"
 }
 
-# Create a security group that allows inbound traffic on port 80 (HTTP)
+terraform {
+  backend "s3" {
+    bucket         = "my-terraform-state-bucket-hcl"
+    key            = "terraform/ansible/terraform.tfstate"
+    region         = "us-east-1"
+  }
+}
+
+resource "aws_instance" "ansible" {
+  ami           = "ami-0c02fb55956c7d316"
+  instance_type = "t2.micro"
+  key_name      = "devsecops.key"
+
+  security_groups = [aws_security_group.web_sg.name]
+
+  # Add a provisioner to use Ansible
+  provisioner "remote-exec" {
+    inline = [
+      "sudo yum update -y",
+      "sudo yum install -y ansible",
+      "echo '[webserver]' > /etc/ansible/hosts",
+      "echo $(hostname -i) >> /etc/ansible/hosts",
+    ]
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = file("~/.ssh/devsecops.key")
+      host        = self.public_ip
+    }
+  }
+
+  tags = {
+    Name = "Terraform-Ansible-EC2"
+  }
+}
+
 resource "aws_security_group" "web_sg" {
-  name_prefix = "web-sg"
+  name        = "web-sg"
+  description = "Allow HTTP and SSH access"
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   ingress {
     from_port   = 80
@@ -19,33 +62,4 @@ resource "aws_security_group" "web_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-}
-
-# Provision an EC2 instance
-resource "aws_instance" "web_server" {
-  ami           = "ami-0e2c8caa4b6378d8c"  # Replace with a valid AMI ID
-  instance_type = "t2.micro"
-  security_groups = [aws_security_group.web_sg.name]
-
-  # Install Ansible and run a playbook using the remote-exec provisioner
-  provisioner "remote-exec" {
-    inline = [
-      "sudo apt update",
-      "sudo apt install -y ansible",
-      "echo '[webservers]' > /tmp/hosts",
-      "echo '${self.public_ip} ansible_connection=ssh ansible_user=ubuntu' >> /tmp/hosts",
-      "ansible-playbook -i /tmp/hosts /tmp/nginx-playbook.yml"
-    ]
-
-    connection {
-      type     = "ssh"
-      user     = "ubuntu"  # Adjust based on the AMI's default user
-      host     = self.public_ip
-    }
-  }
-}
-
-# Output the instance's public IP
-output "instance_public_ip" {
-  value = aws_instance.web_server.public_ip
 }
