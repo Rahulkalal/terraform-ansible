@@ -25,7 +25,6 @@ resource "aws_security_group" "web_sg" {
 resource "aws_instance" "web_server" {
   ami           = "ami-0e2c8caa4b6378d8c"  # Replace with a valid AMI ID
   instance_type = "t2.micro"
-  #key_name      = "my-key-pair"   # Replace with your key pair
   security_groups = [aws_security_group.web_sg.name]
 
   # Install Ansible and run a playbook using the remote-exec provisioner
